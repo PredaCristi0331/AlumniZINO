@@ -1,34 +1,43 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Basic modern UI styling, combined with Tailwind utility classes already present in index.css */
+:root {
+  --glass: rgba(255, 255, 255, 0.08);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.app-shell {
+  min-height: 100vh;
+  background: radial-gradient(1200px 800px at 10% -10%, rgba(59,130,246,.15), transparent),
+              radial-gradient(1000px 600px at 110% 10%, rgba(16,185,129,.12), transparent),
+              linear-gradient(180deg, #0b1020 0%, #0a0f1d 100%);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.card {
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
 }
 
-.App-link {
-    color: #61dafb;
+.input {
+  @apply w-full rounded-md border border-gray-700 bg-black/30 text-white placeholder-gray-400 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.btn {
+  @apply inline-flex items-center gap-2 rounded-md px-4 py-2 text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition;
 }
+.btn-secondary { @apply bg-gray-700 hover:bg-gray-600; }
+.btn-danger { @apply bg-red-600 hover:bg-red-500; }
+
+.label { @apply text-sm text-gray-300; }
+
+.section-title { @apply text-lg font-semibold text-white; }
+
+.table { @apply w-full text-left text-sm; }
+.table th { @apply text-gray-300 font-medium border-b border-gray-700 pb-2; }
+.table td { @apply border-b border-gray-800 py-2; }
+
+.lang-toggle { @apply inline-flex items-center gap-2 rounded-full border border-gray-700 px-2 py-1 bg-black/30; }
+
+.login-badge { @apply text-xs text-gray-300; }
+
+/* Small utilities */
+.hr { @apply border-t border-gray-800 my-4; }
