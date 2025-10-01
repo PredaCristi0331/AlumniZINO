@@ -182,6 +182,7 @@ metadata:
 test_plan:
   current_focus:
     - "Backend endpoints: /api/auth/login, /api/alumni, /api/events, /api/invitations"
+    - "C# proxy endpoints: /api/csharp/alumni/metrics, /api/csharp/invitations/render"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -196,6 +197,8 @@ agent_communication:
     message: "✅ BACKEND TESTING COMPLETE: All 4 backend tasks tested successfully. Health check (GET /api/), Auth login, Alumni CRUD, Events CRUD, and Invitations all working perfectly. Created backend_test.py with comprehensive test suite. All 10 test cases passed. Backend is fully functional and ready for production."
   - agent: "main"
     message: "Added C# proxy endpoints: POST /api/csharp/invitations/render (protected) and GET /api/csharp/alumni/metrics (proxy with local fallback). Will test metrics route and expect 503 for render since CSHARP_API_BASE not configured."
+  - agent: "testing"
+    message: "✅ C# PROXY ENDPOINTS TESTING COMPLETE: Both C# proxy tasks tested successfully. Flow A (metrics fallback): GET /api/csharp/alumni/metrics returns 200 JSON with required keys (total, by_year, by_path, bac, source='local-fallback') as expected since CSHARP_API_BASE not configured. Flow B (render proxy): POST /api/csharp/invitations/render returns expected 503 with detail 'C# service not configured' when CSHARP_API_BASE is absent. Updated backend_test.py with comprehensive C# proxy test suite. All 12 test cases passed including the new C# proxy tests."
 backend:
   - task: "C# proxy - render invitation PDF"
     implemented: true
