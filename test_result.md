@@ -185,6 +185,9 @@ test_plan:
 
 agent_communication:
   - agent: "main"
+    message: "Frontend updated with minimal invite template, CSV export, filters, RSVP and PDF download. Requesting automated frontend testing."
+
+  - agent: "main"
     message: "Please test the backend endpoints with the flows: login -> create alumni -> list alumni -> create event -> list events -> generate invitation -> fetch invitation by token. Ensure CORS and env URL usage. No email sending."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 4 backend tasks tested successfully. Health check (GET /api/), Auth login, Alumni CRUD, Events CRUD, and Invitations all working perfectly. Created backend_test.py with comprehensive test suite. All 10 test cases passed. Backend is fully functional and ready for production."
