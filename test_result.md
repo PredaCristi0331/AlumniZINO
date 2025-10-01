@@ -100,4 +100,79 @@
 
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
+user_problem_statement: "Registru Alumni: alumni + evenimente + generare link invitație; login simplu; UI bilingv; fără email și fără AI la invitații."
+backend:
+  - task: "API Alumni CRUD"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Create/List/Get/Update/Delete endpoints for alumni implemented with UUIDs and ISO dates. Public list; create/update/delete require JWT."
+  - task: "API Events CRUD"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Create/List/Get events implemented. UUIDs & ISO dates."
+  - task: "API Invitations"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Generate invitation token + public fetch by token implemented."
+  - task: "Auth login (JWT)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Seed admin/admin123, simple JWT issuance and header validation."
+frontend:
+  - task: "Bilingv UI + Sections"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Bilingual RO/EN, Alumni section, Events section, Invite page. Uses env REACT_APP_BACKEND_URL."
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Backend endpoints: /api/auth/login, /api/alumni, /api/events, /api/invitations"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Please test the backend endpoints with the flows: login -> create alumni -> list alumni -> create event -> list events -> generate invitation -> fetch invitation by token. Ensure CORS and env URL usage. No email sending."
+
 #====================================================================================================
