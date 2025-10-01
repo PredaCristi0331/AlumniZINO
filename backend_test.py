@@ -278,6 +278,77 @@ class BackendTester:
             self.log_test("Invitations", False, f"Request failed: {str(e)}")
             return False
     
+    def test_csharp_alumni_metrics(self):
+        """Test C# proxy alumni metrics endpoint with local fallback"""
+        try:
+            response = requests.get(f"{self.base_url}/csharp/alumni/metrics", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                required_keys = ["total", "by_year", "by_path", "bac", "source"]
+                
+                # Check if all required keys are present
+                missing_keys = [key for key in required_keys if key not in data]
+                if missing_keys:
+                    self.log_test("C# Alumni Metrics", False, f"Missing keys: {missing_keys}", data)
+                    return False
+                
+                # Check if source indicates local fallback (since CSHARP_API_BASE not configured)
+                if data.get("source") == "local-fallback":
+                    self.log_test("C# Alumni Metrics", True, f"Local fallback working. Total alumni: {data.get('total', 0)}")
+                    return True
+                else:
+                    self.log_test("C# Alumni Metrics", False, f"Expected source='local-fallback', got: {data.get('source')}", data)
+                    return False
+            else:
+                self.log_test("C# Alumni Metrics", False, f"Status: {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("C# Alumni Metrics", False, f"Request failed: {str(e)}")
+            return False
+    
+    def test_csharp_render_invitation(self, event_id: str):
+        """Test C# proxy render invitation endpoint (should return 503 since not configured)"""
+        if not self.auth_token:
+            self.log_test("C# Render Invitation", False, "No auth token available")
+            return False
+        
+        if not event_id:
+            self.log_test("C# Render Invitation", False, "No event ID available")
+            return False
+        
+        try:
+            render_data = {
+                "event_id": event_id,
+                "language": "ro"
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/csharp/invitations/render",
+                json=render_data,
+                headers=self.get_auth_headers(),
+                timeout=10
+            )
+            
+            # Expect 503 since CSHARP_API_BASE is not configured
+            if response.status_code == 503:
+                data = response.json()
+                expected_detail = "C# service not configured"
+                if "detail" in data and expected_detail in data["detail"]:
+                    self.log_test("C# Render Invitation", True, f"Expected 503 error: {data['detail']}")
+                    return True
+                else:
+                    self.log_test("C# Render Invitation", False, f"Expected detail containing '{expected_detail}', got: {data.get('detail')}", data)
+                    return False
+            else:
+                self.log_test("C# Render Invitation", False, f"Expected 503, got status: {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("C# Render Invitation", False, f"Request failed: {str(e)}")
+            return False
+    
     def run_all_tests(self):
         """Run all backend tests in sequence"""
         print(f"🚀 Starting Backend API Tests")
