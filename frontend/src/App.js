@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useParams } from "react-router-dom";
 import axios from "axios";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -45,6 +47,14 @@ const dict = {
     openInvite: "Deschide invitația",
     loggedInAs: "Conectat ca",
     notLoggedIn: "Neautentificat",
+    search: "Caută",
+    filterYear: "Filtru an",
+    exportCsv: "Export CSV",
+    downloadPdf: "Descarcă PDF",
+    rsvpYes: "Confirm participarea",
+    rsvpNo: "Nu pot participa",
+    rsvpStatus: "RSVP",
+    minimalInviteText: "Ești invitat la",
   },
   en: {
     appName: "Alumni Registry",
@@ -83,6 +93,14 @@ const dict = {
     openInvite: "Open invitation",
     loggedInAs: "Logged in as",
     notLoggedIn: "Not logged in",
+    search: "Search",
+    filterYear: "Filter year",
+    exportCsv: "Export CSV",
+    downloadPdf: "Download PDF",
+    rsvpYes: "Confirm attendance",
+    rsvpNo: "Cannot attend",
+    rsvpStatus: "RSVP",
+    minimalInviteText: "You are invited to",
   },
 };
 
@@ -192,6 +210,31 @@ function AlumniSection({ i18n, auth }) {
     phone: "",
   });
   const [list, setList] = useState([]);
+  const [q, setQ] = useState("");
+  const [year, setYear] = useState("");
+
+  const filtered = useMemo(() => {
+    return (list || []).filter(a => {
+      const okQ = q ? (a.full_name?.toLowerCase().includes(q.toLowerCase()) || (a.email||"").toLowerCase().includes(q.toLowerCase())) : true;
+      const okY = year ? String(a.graduation_year) === String(year) : true;
+      return okQ && okY;
+    });
+  }, [list, q, year]);
+
+  function downloadCsv() {
+    const rows = [
+      ["Full Name", "Graduation Year", "Baccalaureate", "Path", "Email", "Phone"],
+      ...filtered.map(a => [a.full_name, a.graduation_year, a.bacalaureat_passed ? "Yes" : "No", a.path, a.email || "", a.phone || ""]),
+    ];
+    const csv = rows.map(r => r.map(cell => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "alumni.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function load() {
     const res = await axios.get(`${API}/alumni`);
@@ -208,9 +251,24 @@ function AlumniSection({ i18n, auth }) {
 
   useEffect(() => { load(); }, []);
 
+  const years = useMemo(() => {
+    const set = new Set((list||[]).map(a => a.graduation_year));
+    return Array.from(set).sort();
+  }, [list]);
+
   return (
     <div className="card p-4">
-      <div className="section-title mb-3">{i18n.t.alumni}</div>
+      <div className="section-title mb-3 flex items-center justify-between">
+        <span>{i18n.t.alumni}</span>
+        <div className="flex gap-2">
+          <input className="input w-48" placeholder={i18n.t.search} value={q} onChange={e => setQ(e.target.value)} />
+          <select className="input w-36" value={year} onChange={e => setYear(e.target.value)}>
+            <option value="">{i18n.t.filterYear}</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button className="btn btn-secondary" onClick={downloadCsv}>{i18n.t.exportCsv}</button>
+        </div>
+      </div>
       <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="label">{i18n.t.fullName}</label>
@@ -262,7 +320,7 @@ function AlumniSection({ i18n, auth }) {
             </tr>
           </thead>
           <tbody>
-            {list.map(a => (
+            {filtered.map(a => (
               <tr key={a.id} className="text-gray-200">
                 <td>{a.full_name}</td>
                 <td>{a.graduation_year}</td>
@@ -361,17 +419,48 @@ function InvitePage({ i18n }) {
   const { token } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const refCard = useRef(null);
+  const [savingPdf, setSavingPdf] = useState(false);
+  const [rsvp, setRsvp] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await axios.get(`${API}/invitations/${token}`);
         setData(res.data);
+        setRsvp(res.data.invitation?.rsvp_status || null);
       } catch (e) {
         setError(i18n.t.notFound);
       }
     })();
   }, [token]);
+
+  async function doRsvp(status) {
+    try {
+      const res = await axios.post(`${API}/invitations/${token}/rsvp`, { status });
+      setRsvp(res.data.invitation?.rsvp_status || status);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async function savePdf() {
+    if (!refCard.current) return;
+    setSavingPdf(true);
+    try {
+      const canvas = await html2canvas(refCard.current, { scale: 2, backgroundColor: "#0b1020" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 60;
+      const imgHeight = canvas.height * (imgWidth / canvas.width);
+      pdf.addImage(imgData, "PNG", 30, 30, imgWidth, Math.min(imgHeight, pageHeight - 60));
+      pdf.save("invitation.pdf");
+    } finally {
+      setSavingPdf(false);
+    }
+  }
 
   if (error) {
     return <div className="text-red-400">{error}</div>;
@@ -380,11 +469,20 @@ function InvitePage({ i18n }) {
 
   const { event } = data;
   return (
-    <div className="card p-4">
+    <div className="card p-4" ref={refCard}>
       <div className="section-title mb-2">{i18n.t.invitationFor}</div>
+      <div className="text-gray-300 mb-1">{i18n.t.minimalInviteText}:</div>
       <div className="text-white text-xl font-semibold">{event.title}</div>
       <div className="text-gray-400">{event.date} · {event.location}</div>
       {event.description && <div className="text-gray-300 mt-2">{event.description}</div>}
+
+      <div className="hr" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <button className="btn btn-secondary" onClick={savePdf} disabled={savingPdf}>{i18n.t.downloadPdf}</button>
+        <span className="text-gray-300 text-sm">{i18n.t.rsvpStatus}: {rsvp ? rsvp : "-"}</span>
+        <button className="btn" onClick={() => doRsvp("yes")}>{i18n.t.rsvpYes}</button>
+        <button className="btn btn-danger" onClick={() => doRsvp("no")}>{i18n.t.rsvpNo}</button>
+      </div>
     </div>
   );
 }

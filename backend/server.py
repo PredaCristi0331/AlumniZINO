@@ -90,6 +90,11 @@ class Invitation(BaseModel):
     token: str
     event_id: str
     created_at: str
+    rsvp_status: Optional[str] = None  # "yes" | "no"
+    rsvp_at: Optional[str] = None
+
+class RSVPRequest(BaseModel):
+    status: str  # "yes" or "no"
 
 class LoginRequest(BaseModel):
     username: str
@@ -238,6 +243,21 @@ async def get_invitation_by_token(token: str):
     return {
         "invitation": parse_from_mongo(inv),
         "event": parse_from_mongo(ev),
+    }
+
+@api_router.post("/invitations/{token}/rsvp")
+async def rsvp_invitation(token: str, req: RSVPRequest):
+    if req.status not in ("yes", "no"):
+        raise HTTPException(status_code=400, detail="Invalid RSVP status")
+    inv = await db.invitations.find_one({"token": token})
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    await db.invitations.update_one({"token": token}, {"$set": {"rsvp_status": req.status, "rsvp_at": iso_now()}})
+    inv = await db.invitations.find_one({"token": token})
+    ev = await db.events.find_one({"id": inv.get("event_id")})
+    return {
+        "invitation": parse_from_mongo(inv),
+        "event": parse_from_mongo(ev) if ev else None,
     }
 
 # Include the router in the main app
