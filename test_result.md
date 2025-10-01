@@ -150,11 +150,14 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Seed admin/admin123, simple JWT issuance and header validation."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Auth login fully functional. POST /api/auth/login with username: 'admin', password: 'admin123' returns 200 with access_token and token_type: 'bearer'. JWT token works for protected endpoints."
 frontend:
   - task: "Bilingv UI + Sections"
     implemented: true
