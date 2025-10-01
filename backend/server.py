@@ -6,11 +6,12 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 from passlib.context import CryptContext
+import requests
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -30,6 +31,10 @@ api_router = APIRouter(prefix="/api")
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 JWT_SECRET = os.environ.get("ADMIN_JWT_SECRET", "dev-admin-secret")  # acceptable fallback for MVP
 JWT_ALG = "HS256"
+
+# External C# service configuration (optional)
+CSHARP_API_BASE = os.environ.get("CSHARP_API_BASE")  # e.g., https://your-csharp-service
+CSHARP_API_KEY = os.environ.get("CSHARP_API_KEY")
 
 # Utils for Mongo <-> Pydantic
 
@@ -104,6 +109,15 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+
+# C# integration models
+class CsRenderRequest(BaseModel):
+    event_id: str
+    language: str = Field(default="ro")  # "ro" or "en"
+
+class CsRenderResponse(BaseModel):
+    pdf_base64: str
+    meta: Optional[Dict[str, Any]] = None
 
 # Auth helpers
 async def ensure_admin_seed():
@@ -259,6 +273,75 @@ async def rsvp_invitation(token: str, req: RSVPRequest):
         "invitation": parse_from_mongo(inv),
         "event": parse_from_mongo(ev) if ev else None,
     }
+
+# =============== C# Integration Proxy Endpoints ===============
+@api_router.post("/csharp/invitations/render", response_model=CsRenderResponse)
+async def cs_render_invitation(payload: CsRenderRequest, _: str = Depends(get_current_user)):
+    if not CSHARP_API_BASE:
+        raise HTTPException(status_code=503, detail="C# service not configured. Set CSHARP_API_BASE env.")
+    # Load event
+    ev = await db.events.find_one({"id": payload.event_id})
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+    ev = parse_from_mongo(ev)
+    url = f"{CSHARP_API_BASE.rstrip('/')}/invitations/render"
+    headers = {"Content-Type": "application/json"}
+    if CSHARP_API_KEY:
+        headers["x-api-key"] = CSHARP_API_KEY
+    data = {
+        "event": {
+            "title": ev.get("title"),
+            "date": ev.get("date"),
+            "location": ev.get("location"),
+            "description": ev.get("description"),
+        },
+        "language": payload.language,
+        "meta": {"source": "emergent-alumni-app"},
+    }
+    try:
+        resp = requests.post(url, json=data, headers=headers, timeout=20)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"C# service error: {resp.status_code}")
+        body = resp.json()
+        if not body.get("pdf_base64"):
+            raise HTTPException(status_code=502, detail="C# service returned no pdf_base64")
+        return CsRenderResponse(**body)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"C# service unreachable: {e}")
+
+@api_router.get("/csharp/alumni/metrics")
+async def cs_alumni_metrics():
+    # If C# base configured, proxy; else return basic local metrics as fallback
+    if CSHARP_API_BASE:
+        url = f"{CSHARP_API_BASE.rstrip('/')}/alumni/metrics"
+        headers = {}
+        if CSHARP_API_KEY:
+            headers["x-api-key"] = CSHARP_API_KEY
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                return resp.json()
+            # if proxy fails, fall back to local
+        except requests.RequestException:
+            pass
+
+    # local fallback metrics
+    rows = await db.alumni.find().to_list(length=5000)
+    total = len(rows)
+    by_year: Dict[str, int] = {}
+    by_path: Dict[str, int] = {}
+    bac = {"passed": 0, "failed": 0}
+    for r in rows:
+        r = parse_from_mongo(r)
+        y = str(r.get("graduation_year"))
+        by_year[y] = by_year.get(y, 0) + 1
+        p = r.get("path") or "other"
+        by_path[p] = by_path.get(p, 0) + 1
+        if r.get("bacalaureat_passed"):
+            bac["passed"] += 1
+        else:
+            bac["failed"] += 1
+    return {"total": total, "by_year": by_year, "by_path": by_path, "bac": bac, "source": "local-fallback"}
 
 # Include the router in the main app
 app.include_router(api_router)

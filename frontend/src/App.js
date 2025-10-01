@@ -51,10 +51,14 @@ const dict = {
     filterYear: "Filtru an",
     exportCsv: "Export CSV",
     downloadPdf: "Descarcă PDF",
+    downloadPdfCS: "Generează PDF (C#)",
     rsvpYes: "Confirm participarea",
     rsvpNo: "Nu pot participa",
     rsvpStatus: "RSVP",
     minimalInviteText: "Ești invitat la",
+    stats: "Statistici",
+    total: "Total",
+    fallbackLocal: "(fallback local)",
   },
   en: {
     appName: "Alumni Registry",
@@ -97,10 +101,14 @@ const dict = {
     filterYear: "Filter year",
     exportCsv: "Export CSV",
     downloadPdf: "Download PDF",
+    downloadPdfCS: "Generate PDF (C#)",
     rsvpYes: "Confirm attendance",
     rsvpNo: "Cannot attend",
     rsvpStatus: "RSVP",
     minimalInviteText: "You are invited to",
+    stats: "Statistics",
+    total: "Total",
+    fallbackLocal: "(local fallback)",
   },
 };
 
@@ -422,6 +430,7 @@ function InvitePage({ i18n }) {
   const refCard = useRef(null);
   const [savingPdf, setSavingPdf] = useState(false);
   const [rsvp, setRsvp] = useState(null);
+  const [csLoading, setCsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -462,6 +471,25 @@ function InvitePage({ i18n }) {
     }
   }
 
+  async function savePdfCS() {
+    try {
+      setCsLoading(true);
+      // We need event_id; token fetch already returned event object
+      const eventId = data?.event?.id;
+      if (!eventId) throw new Error("Missing event id");
+      const res = await axios.post(`${API}/csharp/invitations/render`, { event_id: eventId, language: i18n.lang });
+      const b64 = res.data.pdf_base64;
+      const link = document.createElement("a");
+      link.href = `data:application/pdf;base64,${b64}`;
+      link.download = "invitation_cs.pdf";
+      link.click();
+    } catch (e) {
+      alert("Serviciul C# nu este configurat sau a eșuat.");
+    } finally {
+      setCsLoading(false);
+    }
+  }
+
   if (error) {
     return <div className="text-red-400">{error}</div>;
   }
@@ -479,10 +507,33 @@ function InvitePage({ i18n }) {
       <div className="hr" />
       <div className="flex flex-wrap gap-2 items-center">
         <button className="btn btn-secondary" onClick={savePdf} disabled={savingPdf}>{i18n.t.downloadPdf}</button>
+        <button className="btn" onClick={savePdfCS} disabled={csLoading}>{i18n.t.downloadPdfCS}</button>
         <span className="text-gray-300 text-sm">{i18n.t.rsvpStatus}: {rsvp ? rsvp : "-"}</span>
         <button className="btn" onClick={() => doRsvp("yes")}>{i18n.t.rsvpYes}</button>
         <button className="btn btn-danger" onClick={() => doRsvp("no")}>{i18n.t.rsvpNo}</button>
       </div>
+    </div>
+  );
+}
+
+function StatsCard({ i18n }) {
+  const [stats, setStats] = useState(null);
+  const [source, setSource] = useState("");
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await axios.get(`${API}/csharp/alumni/metrics`);
+        setStats(res.data);
+        setSource(res.data?.source || "");
+      } catch (e) {}
+    })();
+  }, []);
+  if (!stats) return null;
+  return (
+    <div className="card p-4 text-gray-300">
+      <div className="section-title mb-2">{i18n.t.stats} {source ? <span className="text-xs text-gray-400">{source === 'local-fallback' ? i18n.t.fallbackLocal : ''}</span> : null}</div>
+      <div className="text-sm">{i18n.t.total}: {stats.total}</div>
+      <div className="mt-2 text-xs">by_path: {Object.entries(stats.by_path || {}).map(([k,v]) => `${k}:${v}`).join(" · ")}</div>
     </div>
   );
 }
@@ -516,6 +567,7 @@ function Home() {
             <div className="section-title mb-2">Status</div>
             <div className="text-sm">{hello || "…"}</div>
           </div>
+          <StatsCard i18n={i18n} />
         </div>
       </div>
     </div>
