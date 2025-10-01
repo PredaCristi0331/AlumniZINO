@@ -371,6 +371,12 @@ class BackendTester:
         # Test 5: Invitations
         invitations_ok = self.test_invitations(event_id) if event_id else False
         
+        # Test 6: C# Alumni Metrics (with local fallback)
+        csharp_metrics_ok = self.test_csharp_alumni_metrics()
+        
+        # Test 7: C# Render Invitation (should return 503)
+        csharp_render_ok = self.test_csharp_render_invitation(event_id) if event_id else False
+        
         # Summary
         print("=" * 60)
         print("📊 TEST SUMMARY")
